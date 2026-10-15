@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Finanças do Casal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans">
+  <div id="app" class="max-w-4xl mx-auto p-4 space-y-6"></div>
+  <script>
+    const initialData = {"transactions":[],"categories":[{"id":"cart-o-de-cr-dito","type":"despesa","color":"#8B5CF6","name":"Cartão de Crédito"},{"id":"celular---internet","name":"Celular / Internet","type":"despesa","color":"#06B6D4"},{"id":"energia----gua","color":"#F59E0B","type":"despesa","name":"Energia / Água"},{"id":"extras-a-receber","name":"Extras a Receber","color":"#14B8A6","type":"receita"},{"id":"gastos-da-casa","name":"Gastos da Casa","color":"#3B82F6","type":"ambos"},{"id":"sal-rio---renda","name":"Salário / Renda","color":"#10B981","type":"receita"},{"id":"supermercado","name":"Supermercado","type":"despesa","color":"#EC4899"}],"projects":[]};
+    const saved = localStorage.getItem('financas_casal_data');
+    const state = saved ? JSON.parse(saved) : initialData;
+    function saveState() { localStorage.setItem('financas_casal_data', JSON.stringify(state)); render(); }
+    function formatBRL(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0); }
+    function maskPIX(v) {
+      const d = String(v).replace(/\D/g, '');
+      if (!d) return '';
+      return (parseInt(d, 10) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function parseBRL(v) {
+      if (!v) return 0;
+      return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    function render() {
+      const rec = state.transactions.filter(t => t.type === 'receita').reduce((a, b) => a + Number(b.amount || 0), 0);
+      const desp = state.transactions.filter(t => t.type === 'despesa').reduce((a, b) => a + Number(b.amount || 0), 0);
+      document.getElementById('app').innerHTML = `
+        <header class="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow">
+          <div>
+            <h1 class="font-bold text-lg">Finanças do Casal (App Web)</h1>
+            <p class="text-xs text-slate-400">Versão pronta para Vercel / Celular</p>
+          </div>
+          <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full">Ativo</span>
+        </header>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200">
+            <div class="text-xs text-slate-400 font-bold uppercase">Saldo Previsto</div>
+            <div class="text-xl font-extrabold mt-1">${formatBRL(rec - desp)}</div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-emerald-200">
+            <div class="text-xs text-emerald-600 font-bold uppercase">Entradas</div>
+            <div class="text-xl font-extrabold text-emerald-600 mt-1">${formatBRL(rec)}</div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-rose-200">
+            <div class="text-xs text-rose-600 font-bold uppercase">Saídas</div>
+            <div class="text-xl font-extrabold text-rose-600 mt-1">${formatBRL(desp)}</div>
+          </div>
+        </div>
+        <form id="txForm" class="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+          <h2 class="font-bold text-sm">Adicionar Conta Rápida (Com Centavos Automáticos)</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <input id="title" required placeholder="Nome (ex: Energia)" class="px-3 py-2 border rounded-xl text-sm" />
+            <input id="amount" type="tel" inputMode="numeric" required placeholder="Valor (ex: 300,80)" class="px-3 py-2 border rounded-xl text-sm font-bold" oninput="this.value = maskPIX(this.value)" />
+            <select id="type" class="px-3 py-2 border rounded-xl text-sm">
+              <option value="despesa">A Pagar (Despesa)</option>
+              <option value="receita">A Receber (Receita)</option>
+            </select>
+            <button class="bg-slate-900 text-white font-bold text-sm rounded-xl py-2 px-4">Salvar</button>
+          </div>
+        </form>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2">
+          <h2 class="font-bold text-sm mb-2">Contas Cadastradas (${state.transactions.length})</h2>
+          ${state.transactions.map((t, idx) => `
+            <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100">
+              <div>
+                <div class="font-bold text-sm ${t.status === 'pago' ? 'line-through text-slate-400' : ''}">${t.title}</div>
+                <div class="text-xs text-slate-400">${t.category || 'Geral'} • Venc: ${t.dueDate || 'Hoje'}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-extrabold text-sm ${t.type === 'receita' ? 'text-emerald-600' : 'text-rose-600'}">${formatBRL(t.amount)}</span>
+                <button onclick="delTx(${idx})" class="text-xs text-rose-500 px-2 py-1">Excluir</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      document.getElementById('txForm').onsubmit = function(e) {
+        e.preventDefault();
+        state.transactions.unshift({
+          title: document.getElementById('title').value,
+          amount: parseBRL(document.getElementById('amount').value),
+          type: document.getElementById('type').value,
+          category: 'Gastos da Casa',
+          dueDate: new Date().toISOString().split('T')[0],
+          status: 'pendente'
+        });
+        saveState();
+      };
+    }
+    window.delTx = function(i) { state.transactions.splice(i, 1); saveState(); };
+    render();
+  </script>
+</body>
+</html>
